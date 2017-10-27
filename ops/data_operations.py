@@ -31,17 +31,17 @@ face = "face"
 def load_mat_file(file):
 	"""
 	Load MATLAB file
-
+	
 	Parameters
 	----------
 	file : str
-	    Name of the mat file
+		   Name of the mat file
 	       
 	Returns
     -------
     mat_dict : dict
-       dictionary with variable names as keys, and loaded matrices as
-       values
+       		   dictionary with variable names as keys, and loaded matrices as
+    		   values
 	"""
 	return sio.loadmat(file)
 
