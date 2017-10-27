@@ -110,14 +110,16 @@ class DTW(object):
 						total_distance += get_dtw_distance(train_od, test_od)
 						total_distance += get_dtw_distance(train_ond, test_ond)
 						total_distance += get_dtw_distance((train_ld-train_lnd), (test_ld-test_lnd))
-						
+						total_distance += get_dtw_distance(get_vec_direction_of_motion(train_ld-train_lnd),
+														   get_vec_direction_of_motion(test_ld-test_lnd))
+
 					distances.append([total_distance, train_lnd_is_empty, train_notation[dop.lexicon][j][0][0]])
 				
 				else:
 					continue
 				# break
-			self.evaluate_prediction(test_target, distances)
-			break
+			self.evaluate_prediction(test_target, distances, i)
+			# break
 		
 		self.display_accuracy(test_size)
 		end = time.clock()
@@ -129,7 +131,7 @@ class DTW(object):
 		"""
 		print("Accuracy :", (self.correct/test_size))
 		
-	def evaluate_prediction(self, test_target, distances):
+	def evaluate_prediction(self, test_target, distances, test_number):
 		"""
 		counts how many times did DTW gave the correct prediction in top k results
 		
@@ -148,6 +150,7 @@ class DTW(object):
 		distances = np.array(distances)
 		if test_target in distances[:, 2]:
 			self.correct += 1
+		# print(test_number, self.correct)
 			
 			
 def get_dtw_distance(x, y):
@@ -162,33 +165,35 @@ def get_fast_dtw_distance(x, y):
 
 def perform_pre_processing(data, i):
 	ld = data[i][0].astype('float64')
-	ld = pp.find_centroid(ld)
+	ld = pp.find_centroid(ld)  # Centroid of dominant hand
 	ond = []
 	face = data[i][2][0].astype('float64')
 	
 	face = face.reshape(1, face.shape[0])
-	face = pp.find_centroid(face)
+	face = pp.find_centroid(face)  # Centroid of face
+	
+	diagonal = pp.get_face_diagonal(data[i][2][0][1].astype('float64'), data[i][2][0][0].astype('float64'))
 	
 	lnd = data[i][1].astype('float64')
 	if lnd.size == 0:
 		lnd_is_empty = True
 	else:
 		lnd_is_empty = False
-		lnd = pp.find_centroid(lnd)
+		lnd = pp.find_centroid(lnd)  # Centroid of non-dominant hand if non-dominant hand exist
 	
-	ld = pp.find_relative_coordinates(face, ld)
+	ld = pp.find_relative_coordinates(face, ld)  # Centroid co-ordinates of dominant hand w.r.t face centroid as origin
+	od = get_vec_direction_of_motion(ld)  # Unit vector representing direction of motion from ld(X, t-1) to ld(X, t)
+	ld = ld / diagonal  # Face normalization on dominant-hand by dividing co-ordinates by face diagonal length
 	
-	od = get_vec_direction_of_motion(ld)
-
 	if not lnd_is_empty:
-		lnd = pp.find_relative_coordinates(face, lnd)
-		ond = get_vec_direction_of_motion(lnd)
-		
+		lnd = pp.find_relative_coordinates(face, lnd)  # Non-dominant hand Centroid co-ordinates w.r.t face centroid as origin
+		ond = get_vec_direction_of_motion(lnd)  # Unit vector representing direction of motion from lnd(X, t-1) to lnd(X, t)
+		lnd = lnd / diagonal  # Face normalization on non-dominant-hand by dividing co-ordinates by face diagonal length
+	
 	return ld, lnd, face, lnd_is_empty, od, ond
 
 
 def get_vec_direction_of_motion(data):
-	# print(data)
 	current_frames = data[0: data.shape[0]-1, :].astype('float64')
 	previous_frames = data[1:, :].astype('float64')
 	final_frames = (previous_frames - current_frames).astype('float64')
@@ -196,13 +201,8 @@ def get_vec_direction_of_motion(data):
 	sum_of_points = np.sum(square_of_points, axis=1)
 	sum_of_points = np.transpose(np.asmatrix(sum_of_points))
 	square_root = np.sqrt(sum_of_points)
-	# print(square_root)
-	# print("=====================")
-	# print(final_frames)
 	square_root[square_root == 0.0] = 0.0001
 	final_frames = final_frames/square_root
-	# print("=====================")
-	# print(final_frames)
 	return final_frames
 
 
